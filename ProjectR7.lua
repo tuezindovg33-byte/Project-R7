@@ -43,14 +43,42 @@ local function getHRP()
     return char and char:FindFirstChild("HumanoidRootPart")
 end
 
-local function killNPC(npc)
-    local hum = npc:FindFirstChildOfClass("Humanoid")
-    if not hum or hum.Health <= 0 then return end
+local function getEquippedTool()
+    local char = getCharacter()
+    if not char then return nil end
+    for _, v in ipairs(char:GetChildren()) do
+        if v:IsA("Tool") then return v end
+    end
+    return nil
+end
+
+local function simulateAttack(npcHRP)
+    local tool = getEquippedTool()
+    local hrp = getHRP()
+    if not hrp then return end
+
+    -- Teleporta o personagem perto do NPC temporariamente pra tool registrar o hit
+    local originalCFrame = hrp.CFrame
 
     if AuraMode == "Instant Kill" then
-        hum.Health = 0
+        -- Move até o NPC, dispara o Activated da tool e volta
+        hrp.CFrame = npcHRP.CFrame * CFrame.new(0, 0, 2)
+        if tool then
+            tool:Activate()
+        end
+        task.wait(0.05)
+        hrp.CFrame = originalCFrame
     elseif AuraMode == "Damage" then
-        hum:TakeDamage(AuraDamage)
+        hrp.CFrame = npcHRP.CFrame * CFrame.new(0, 0, 2)
+        if tool then
+            -- Dispara multiplas vezes baseado no dano configurado
+            local hits = math.ceil(AuraDamage / 10)
+            for i = 1, hits do
+                tool:Activate()
+                task.wait(0.05)
+            end
+        end
+        hrp.CFrame = originalCFrame
     end
 
     AuraKillCount = AuraKillCount + 1
@@ -75,7 +103,9 @@ local function startAuraKill()
                 if npcHRP and npcHum and npcHum.Health > 0 then
                     local dist = (hrp.Position - npcHRP.Position).Magnitude
                     if dist <= AuraDistance then
-                        killNPC(obj)
+                        task.spawn(function()
+                            simulateAttack(npcHRP)
+                        end)
                     end
                 end
             end
